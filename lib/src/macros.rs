@@ -1,3 +1,5 @@
+use bytemuck::{Pod, Zeroable};
+
 #[macro_export]
 macro_rules! impl_to_bytes {
     ($struct_name:ident) => {
@@ -200,4 +202,30 @@ macro_rules! instruction {
             }
         }
     };
+}
+
+#[test]
+pub fn test_impl_instruction_from_bytes() {
+
+    #[repr(u8)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum AccountType {
+        TestAccount = 0,
+        TestAccount2 = 1,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
+    #[repr(C)]
+    pub struct TestAccount {
+        pub a: u8,
+        pub b: u8,
+    }
+
+    account!(AccountType, TestAccount);
+
+    let test_account = TestAccount { a: 1, b: 2 };
+    let bytes = test_account.to_bytes();
+    
+
+    assert_eq!(test_account, test_account2);
 }

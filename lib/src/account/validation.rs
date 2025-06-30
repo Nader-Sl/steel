@@ -14,6 +14,7 @@ pub trait AccountInfoValidation {
     fn is_program(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
     fn is_sysvar(&self, sysvar_id: &Pubkey) -> Result<&Self, ProgramError>;
     fn has_address(&self, address: &Pubkey) -> Result<&Self, ProgramError>;
+    fn has_address_any(&self, addresses: &[&Pubkey]) -> Result<&Self, ProgramError>;
     fn has_owner(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
     fn has_seeds(&self, seeds: &[&[u8]], program_id: &Pubkey) -> Result<&Self, ProgramError>;
 }
@@ -98,6 +99,19 @@ impl AccountInfoValidation for AccountInfo<'_> {
     }
 
     #[track_caller]
+    fn has_address_any(&self, addresses: &[&Pubkey]) -> Result<&Self, ProgramError> {
+        for address in addresses {
+            if self.key.eq(address) {
+                return Ok(self);
+            }
+        }
+        return Err(trace(
+            "Account has invalid address",
+            ProgramError::InvalidAccountData,
+        ));
+    }
+
+    #[track_caller]
     fn has_owner(&self, owner: &Pubkey) -> Result<&Self, ProgramError> {
         if self.owner.ne(owner) {
             return Err(trace(
@@ -148,7 +162,7 @@ impl AsAccount for AccountInfo<'_> {
             // Validate account data length.
             let data = self.try_borrow_data()?;
             let expected_len = 8 + std::mem::size_of::<T>();
-            if data.len() != expected_len {
+            if data.len() < expected_len {
                 return Err(ProgramError::InvalidAccountData);
             }
 
@@ -169,7 +183,7 @@ impl AsAccount for AccountInfo<'_> {
             // Validate account data length.
             let mut data = self.try_borrow_mut_data()?;
             let expected_len = 8 + std::mem::size_of::<T>();
-            if data.len() != expected_len {
+            if data.len() < expected_len {
                 return Err(ProgramError::InvalidAccountData);
             }
 
