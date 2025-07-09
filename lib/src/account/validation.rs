@@ -1,5 +1,7 @@
 use bytemuck::Pod;
-use solana_program::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
+use solana_program::{
+    account_info::AccountInfo, bpf_loader_upgradeable, program_error::ProgramError, pubkey::Pubkey,
+};
 
 use crate::trace;
 
@@ -12,6 +14,7 @@ pub trait AccountInfoValidation {
     fn is_empty(&self) -> Result<&Self, ProgramError>;
     fn is_type<T: Discriminator>(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
     fn is_program(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
+    fn is_a_program(&self) -> Result<&Self, ProgramError>;
     fn is_sysvar(&self, sysvar_id: &Pubkey) -> Result<&Self, ProgramError>;
     fn has_address(&self, address: &Pubkey) -> Result<&Self, ProgramError>;
     fn has_address_any(&self, addresses: &[&Pubkey]) -> Result<&Self, ProgramError>;
@@ -46,7 +49,10 @@ impl AccountInfoValidation for AccountInfo<'_> {
     fn is_program(&self, program_id: &Pubkey) -> Result<&Self, ProgramError> {
         self.has_address(program_id)?.is_executable()
     }
-
+    #[track_caller]
+    fn is_a_program(&self) -> Result<&Self, ProgramError> {
+        self.is_executable()
+    }
     #[track_caller]
     fn is_signer(&self) -> Result<&Self, ProgramError> {
         if !self.is_signer {
@@ -79,10 +85,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
     #[track_caller]
     fn is_writable(&self) -> Result<&Self, ProgramError> {
         if !self.is_writable {
-            return Err(trace(
-                "Account is not writable",
-                ProgramError::MissingRequiredSignature,
-            ));
+            return Err(trace("Account is not writable", ProgramError::Immutable));
         }
         Ok(self)
     }

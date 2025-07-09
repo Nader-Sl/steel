@@ -1,4 +1,14 @@
-use solana_program::{program_error::ProgramError, pubkey::Pubkey};
+use std::str::FromStr;
+
+use solana_program::{
+    account_info::AccountInfo,
+    bpf_loader_upgradeable::ID as BPF_LOADER_UPGRADEABLE_ID,
+    msg,
+    program_error::ProgramError,
+    pubkey::Pubkey,
+    system_program, sysvar,
+    sysvar::instructions::{load_current_index_checked, load_instruction_at_checked},
+};
 
 /// Parses an instruction from the instruction data.
 pub fn parse_instruction<'a, T: std::convert::TryFrom<u8>>(
@@ -21,6 +31,46 @@ pub fn parse_instruction<'a, T: std::convert::TryFrom<u8>>(
 
     // Return
     Ok((ix, data))
+}
+
+fn is_system_program(program_id: &Pubkey) -> bool {
+    let compute_budget_id =
+        Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap();
+
+    program_id == &compute_budget_id
+        || program_id == &system_program::ID
+        || program_id == &sysvar::instructions::ID
+}
+
+#[inline(always)]
+pub fn get_caller_program_id<'info>(
+    ix_sysvar_account: &AccountInfo<'info>,
+) -> std::result::Result<Pubkey, ProgramError> {
+    let current_index = load_current_index_checked(ix_sysvar_account)?;
+    // let integration_test = cfg!(feature = "integration-test");
+    msg!("current_index: {}", current_index);
+
+    // if integration_test {
+    //     return Ok(
+    //         load_instruction_at_checked(current_index as usize, ix_sysvar_account)?.program_id,
+    //     );
+    // }
+
+    // Check if this is the first instruction in the transaction
+    // if current_index == 0 {
+    //     // Program was likely called directly by the client (not via CPI)
+    //     return Err(ProgramError::IllegalOwner);
+    // }
+
+    // Iterate backwards to find the last CPI caller.
+    //  for idx in (0..=current_index).rev() {
+    let insn = load_instruction_at_checked(current_index as usize, ix_sysvar_account)?;
+
+    // if !is_system_program(&insn.program_id) {
+    return Ok(insn.program_id);
+    // }
+    // }
+    //  return Err(ProgramError::InvalidInstructionData);
 }
 
 /// Converts a string into a fixed-size byte array of length N.
